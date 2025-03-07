@@ -159,6 +159,5 @@ int chmod(const std::string& mode, const std::string& input_file) {
                 throw std::invalid_argument("Invalid operator '" + std::string(1, operation) + "'");
         }
     }
-
     return chmod(input_file.c_str(), new_mode);
 }

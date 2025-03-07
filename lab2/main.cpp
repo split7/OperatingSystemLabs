@@ -2,7 +2,7 @@
 #include <iostream>
 
 /*
-g++-14 --std=c++26 -Wall -Wpedantic -Wextra -Werror main.cpp chmod.cpp cp.cpp info.cpp mv.cpp -o lab2
+g++-14 --std=c++26 -Wall -Wpedantic -Wextra -Werror main.cpp chmod.cpp cp.cpp info.cpp mv.cpp read_n.cpp -o lab2
 Необходимо написать программу для работы с файлами, по-
 лучающую информацию из командной строки или из консоли вво-
 да.
@@ -52,6 +52,7 @@ extern void cp(const std::string& input_file, const std::string& output_file);
 extern void mv(const std::string& input_file, const std::string& output_file);
 extern void info(const std::string& input_file);
 extern void chmod(const std::string& mode, const std::string& input_file);
+extern void read_n(const std::string& input_file);
 
 
 int main(const int argc, char* argv[]) {
@@ -81,6 +82,11 @@ int main(const int argc, char* argv[]) {
             throw std::invalid_argument("Wrong number of arguments");
         }
         chmod(argv[2], argv[3]);
-    }else
+    } else if (strcmp(argv[1], "read_n") == 0) { //Доп функция
+        if (argc != 3)
+            throw std::invalid_argument("Wrong number of arguments");
+        read_n(argv[2]);
+    }
+    else
         throw std::invalid_argument("Wrong arguments");
 }
