@@ -2,6 +2,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <filesystem>
 
 /*
 Функция копирования файлов
@@ -9,14 +10,17 @@
 - название копии файла
 - копирует содержимое
  */
-void cp(const std::string& str1,const std::string& str2) {
-    if (str1 == str2) {
-        throw std::invalid_argument("cp: str1 == str2");
+void cp(const std::string& input_file,const std::string& output_file) {
+    if (input_file == output_file) {
+        throw std::invalid_argument("cp: input_file == output_file");
     }
-    std::ifstream ifs(str1, std::ios::binary);
+    std::ifstream ifs(input_file, std::ios::binary);
     if (!ifs.is_open())
         throw std::invalid_argument("cp: could not open input file");
-    std::ofstream ofs(str2, std::ios::binary);
+    if (std::filesystem::path target = output_file, source = input_file; !exists(target) && target.parent_path() != source.parent_path()) {
+        create_directories(target.parent_path());
+    }
+    std::ofstream ofs(output_file, std::ios::binary);
     if (!ofs.is_open()) {
         ifs.close();
         throw std::invalid_argument("cp: could not open output file");

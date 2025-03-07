@@ -44,7 +44,8 @@ void help() {
         "chmod [ugoa]*([-+=]([rwxXst]*|[ugo]))+|[-+=][0-7]+ <input_file>\n"
         "<input_file> - имя файла, права которого изменяем\n"
         "+ - добавление полномочий\n"
-        "- - отобрать полномочия" << std::endl;
+        "- - отобрать полномочия\n"
+        "= - установить полномочия"<< std::endl;
 }
 
 extern void cp(const std::string& input_file, const std::string& output_file);
