@@ -1,53 +1,59 @@
-/*
-С процесса-сервера запускается n процессов клиентов. Для каждого из созданных клиентов указывается
-время жизни(в секундах). Клиент запускается, существует заданное время и завершает работу.
-Также следует предусмотреть значение для бесконечного времени. Требуется не менее трёх одновременно
-запускаемых процессов-клиентов.
- */
+// Сервер (server.cpp)
 #include <windows.h>
 #include <iostream>
 #include <vector>
 #include <memory>
+#include <string>
 
 struct ClientData {
-    std::wstring pipeName; //Имя канала
-    DWORD lifetime; //Время жизни
-    HANDLE hPipe; //Дескриптор канала
+    std::wstring pipeName;
+    DWORD lifetime;
+    HANDLE hPipe;
     HANDLE hEvent;
+    HANDLE hPipeReadyEvent;
 };
 
 DWORD WINAPI ClientThread(LPVOID lpParameter) {
     std::unique_ptr<ClientData> clientData(static_cast<ClientData*>(lpParameter));
 
+    // Создание канала с двунаправленным доступом
     clientData->hPipe = CreateNamedPipeW(
         clientData->pipeName.c_str(),
-        PIPE_ACCESS_OUTBOUND,
+        PIPE_ACCESS_OUTBOUND,  // Изменено на DUPLEX для двусторонней связи
         PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
         1,
         1024,
         1024,
         0,
         NULL);
+
     if (clientData->hPipe == INVALID_HANDLE_VALUE) {
-        std::wcerr << "[ERROR] CreateNamedPipe failed with "<< GetLastError() << std::endl;
+        std::wcerr << L"[ERROR] CreateNamedPipe failed with " << GetLastError() << std::endl;
         SetEvent(clientData->hEvent);
         return 1;
     }
 
+    // Уведомляем, что канал готов к подключению
+    SetEvent(clientData->hPipeReadyEvent);
+
+    // Ожидание подключения клиента
     if (!ConnectNamedPipe(clientData->hPipe, NULL)) {
-        std::wcerr << "[ERROR] Connection failed with " << GetLastError() << std::endl;
-        CloseHandle(clientData->hPipe);
-        SetEvent(clientData->hEvent);
-        return 1;
+        DWORD err = GetLastError();
+        if (err != ERROR_PIPE_CONNECTED) {
+            std::wcerr << L"[ERROR] Connection failed with " << err << std::endl;
+            CloseHandle(clientData->hPipe);
+            SetEvent(clientData->hEvent);
+            return 1;
+        }
     }
 
+    // Отправка времени жизни
     DWORD bytesWritten;
     if (!WriteFile(clientData->hPipe, &clientData->lifetime, sizeof(clientData->lifetime), &bytesWritten, NULL)) {
-        std::wcerr << "[ERROR] WriteFile failed with " << GetLastError() << std::endl;
-    } else {
-        std::wcout << "To client " << clientData->pipeName << " send time: " << clientData->lifetime << " seconds"<< std::endl;
+        std::wcerr << L"[ERROR] WriteFile failed with " << GetLastError() << std::endl;
     }
 
+    // Закрытие канала
     FlushFileBuffers(clientData->hPipe);
     DisconnectNamedPipe(clientData->hPipe);
     CloseHandle(clientData->hPipe);
@@ -55,66 +61,71 @@ DWORD WINAPI ClientThread(LPVOID lpParameter) {
     return 0;
 }
 
-int main() {
+int wmain() {
     int clientCount;
-    std::cout << "Enter the number of client processes: ";
+    std::wcout << L"Enter the number of client processes: ";
     std::cin >> clientCount;
 
     std::vector<HANDLE> events;
 
     for (int i = 0; i < clientCount; ++i) {
         DWORD lifetime;
-        std::cout << "Enter the lifetime of client " << i + 1 << "(0) - infinite ";
+        std::wcout << L"Enter the lifetime of client " << i + 1 << L" (0 - infinite): ";
         std::cin >> lifetime;
 
-        auto client = std::make_unique<ClientData>(); //Информация для клиента
+        auto client = std::make_unique<ClientData>();
         client->lifetime = lifetime;
-        client->pipeName = L"\\\\.\\pipe\\mynamedpipe" + std::to_wstring(i);
+        client->pipeName = L"\\\\.\\pipe\\mynamedpipe_" + std::to_wstring(i);
         client->hEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
+        client->hPipeReadyEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
 
-        std::wstring clientPipeName = client->pipeName;
+        HANDLE hEvent = client->hEvent;
+        HANDLE hPipeReadyEvent = client->hPipeReadyEvent;
+        events.push_back(hEvent);
 
-        HANDLE hThread = CreateThread(
-            NULL,
-            0,
-            ClientThread,
-            client.get(),
-            0,
-            NULL);
+        // Запуск потока
+        HANDLE hThread = CreateThread(NULL, 0, ClientThread, client.get(), 0, NULL);
+        if (!hThread) {
+            std::wcerr << L"[ERROR] CreateThread failed: " << GetLastError() << std::endl;
+            CloseHandle(client->hEvent);
+            CloseHandle(client->hPipeReadyEvent);
+            continue;
+        }
+        client.release();
+        CloseHandle(hThread);
 
-        if (hThread) {
-            client.release();
-            events.push_back(client->hEvent);
+        // Ожидание готовности канала
+        WaitForSingleObject(hPipeReadyEvent, INFINITE);
 
-            std::wstring cmd = L"client.exe " + clientPipeName;
-            STARTUPINFO startupInfo = {sizeof(startupInfo)};
-            PROCESS_INFORMATION processInformation;
-            if (!CreateProcessW(
-            NULL,
-            &cmd[0],
+        // Запуск клиента с правильными аргументами
+        std::wstring cmd = L"client.exe " + client->pipeName;
+        std::vector<wchar_t> cmdLine(cmd.begin(), cmd.end());
+        cmdLine.push_back(L'\0'); // Обязательный нулевой терминатор
+
+        STARTUPINFOW si = { sizeof(si) };
+        PROCESS_INFORMATION pi;
+        if (!CreateProcessW(
+            L"client.exe",
+             cmdLine.data(),
             NULL,
             NULL,
             FALSE,
-            0,
+            CREATE_NEW_CONSOLE,
             NULL,
             NULL,
-            reinterpret_cast<LPSTARTUPINFOW>(&startupInfo),
-            &processInformation)) {
-                std::wcerr << "[ERROR] CreateProcess failed with " << GetLastError() << std::endl;
-            }else {
-                CloseHandle(processInformation.hThread);
-                CloseHandle(processInformation.hProcess);
-            }
+            &si,
+            &pi)) {
+            std::wcerr << L"[ERROR] CreateProcess failed: " << GetLastError() << std::endl;
         } else {
-            std::wcerr << "[ERROR] CreateThread failed with " << GetLastError() << std::endl;
-            CloseHandle(client->hEvent);
+            CloseHandle(pi.hThread);
+            CloseHandle(pi.hProcess);
         }
     }
 
     WaitForMultipleObjects(events.size(), events.data(), TRUE, INFINITE);
 
-    for (HANDLE thread : events) {
-        CloseHandle(thread);
+    for (HANDLE event : events) {
+        CloseHandle(event);
     }
 
     return 0;

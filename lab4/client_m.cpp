@@ -2,54 +2,62 @@
 #include <iostream>
 #include <string>
 
-int main(int argc, wchar_t* argv[]) {
-    if (argc < 2) {
-        std::wcerr << L"Using: client.exe <namedPipe>" << std::endl;
+int wmain(int argc, wchar_t* argv[]) {
+
+    // Ожидание доступности канала
+    if (!WaitNamedPipeW(argv[1], 10000)) {
+        std::wcerr << L"WaitNamedPipe failed: " << GetLastError() << std::endl;
+        system("pause");
         return 1;
     }
 
-    HANDLE hPipe; //Подключение к каналу
-    while (true) {
-        hPipe = CreateFileW(
-            argv[1],
-            GENERIC_READ,
-            0,
-            NULL,
-            OPEN_EXISTING,
-            0,
-            NULL);
-        if (hPipe == INVALID_HANDLE_VALUE) break;
+    // Подключение к каналу
+    HANDLE hPipe = CreateFileW(
+        argv[1],
+        GENERIC_READ,
+        0,
+        NULL,
+        OPEN_EXISTING,
+        0,
+        NULL);
 
-        if(GetLastError() == ERROR_PIPE_BUSY) {
-            std::wcerr << "Cant connect with " << GetLastError() << std::endl;
-            return 1;
-        }
-
-        WaitNamedPipeW(argv[1], NMPWAIT_WAIT_FOREVER);
+    if (hPipe == INVALID_HANDLE_VALUE) {
+        std::wcerr << L"CreateFile failed: " << GetLastError() << std::endl;
+        system("pause");
+        return 1;
     }
 
+    DWORD mode = PIPE_READMODE_MESSAGE;
+    if (!SetNamedPipeHandleState(hPipe, &mode, NULL, NULL)) {
+        std::wcerr << L"SetNamedPipeHandleState failed: " << GetLastError() << std::endl;
+        CloseHandle(hPipe);
+        system("pause");
+        return 1;
+    }
+
+    // Чтение времени жизни
     DWORD lifetime;
     DWORD bytesRead;
-
     if (!ReadFile(hPipe, &lifetime, sizeof(lifetime), &bytesRead, NULL)) {
-        std::wcerr << "ReadFile failed with " << GetLastError() << std::endl;
+        std::wcerr << L"ReadFile failed: " << GetLastError() << std::endl;
         CloseHandle(hPipe);
+        system("pause");
         return 1;
     }
 
     CloseHandle(hPipe);
 
-    if(lifetime == 0) {
-        std::wcout << "Infinite lifetime" << std::endl;
-        while (true) {
+    // Логика работы
+    if (lifetime == 0) {
+        std::wcout << L"Running indefinitely..." << std::endl;
+        while (true)
             Sleep(1000);
-            std::wcout << "Working..." << std::endl;
-        }
     }
-    for (DWORD i = lifetime;i > 0 ; --i) {
-        std::wcout << i << " seconds left" << std::endl;
+    for (DWORD i = lifetime; i > 0; --i) {
+        std::wcout << i << L" seconds remaining" << std::endl;
         Sleep(1000);
     }
-    std::wcout << "Time's up"<<std::endl;
+    std::wcout << L"Client exiting." << std::endl;
+    system("pause");
     return 0;
 }
