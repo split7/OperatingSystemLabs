@@ -14,7 +14,7 @@ int wmain(int argc, wchar_t* argv[]) {
     // Подключение к каналу
     HANDLE hPipe = CreateFileW(
         argv[1],
-        GENERIC_READ,
+        GENERIC_READ | GENERIC_WRITE,
         0,
         NULL,
         OPEN_EXISTING,

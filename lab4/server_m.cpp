@@ -1,4 +1,3 @@
-// Сервер (server.cpp)
 #include <windows.h>
 #include <iostream>
 #include <vector>
@@ -16,10 +15,9 @@ struct ClientData {
 DWORD WINAPI ClientThread(LPVOID lpParameter) {
     std::unique_ptr<ClientData> clientData(static_cast<ClientData*>(lpParameter));
 
-    // Создание канала с двунаправленным доступом
     clientData->hPipe = CreateNamedPipeW(
         clientData->pipeName.c_str(),
-        PIPE_ACCESS_OUTBOUND,  // Изменено на DUPLEX для двусторонней связи
+        PIPE_ACCESS_DUPLEX,
         PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
         1,
         1024,
@@ -33,10 +31,8 @@ DWORD WINAPI ClientThread(LPVOID lpParameter) {
         return 1;
     }
 
-    // Уведомляем, что канал готов к подключению
     SetEvent(clientData->hPipeReadyEvent);
 
-    // Ожидание подключения клиента
     if (!ConnectNamedPipe(clientData->hPipe, NULL)) {
         DWORD err = GetLastError();
         if (err != ERROR_PIPE_CONNECTED) {
@@ -47,13 +43,11 @@ DWORD WINAPI ClientThread(LPVOID lpParameter) {
         }
     }
 
-    // Отправка времени жизни
     DWORD bytesWritten;
     if (!WriteFile(clientData->hPipe, &clientData->lifetime, sizeof(clientData->lifetime), &bytesWritten, NULL)) {
         std::wcerr << L"[ERROR] WriteFile failed with " << GetLastError() << std::endl;
     }
 
-    // Закрытие канала
     FlushFileBuffers(clientData->hPipe);
     DisconnectNamedPipe(clientData->hPipe);
     CloseHandle(clientData->hPipe);
@@ -63,8 +57,10 @@ DWORD WINAPI ClientThread(LPVOID lpParameter) {
 
 int wmain() {
     int clientCount;
-    std::wcout << L"Enter the number of client processes: ";
-    std::cin >> clientCount;
+    do {
+        std::wcout << L"Enter the number of client processes (at least 3): ";
+        std::cin >> clientCount;
+    } while (clientCount < 3);
 
     std::vector<HANDLE> events;
 
@@ -79,11 +75,11 @@ int wmain() {
         client->hEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
         client->hPipeReadyEvent = CreateEventW(NULL, TRUE, FALSE, NULL);
 
+        std::wstring pipeName = client->pipeName; // Сохраняем имя канала до передачи владения
         HANDLE hEvent = client->hEvent;
         HANDLE hPipeReadyEvent = client->hPipeReadyEvent;
         events.push_back(hEvent);
 
-        // Запуск потока
         HANDLE hThread = CreateThread(NULL, 0, ClientThread, client.get(), 0, NULL);
         if (!hThread) {
             std::wcerr << L"[ERROR] CreateThread failed: " << GetLastError() << std::endl;
@@ -92,21 +88,18 @@ int wmain() {
             continue;
         }
         client.release();
-        CloseHandle(hThread);
 
-        // Ожидание готовности канала
         WaitForSingleObject(hPipeReadyEvent, INFINITE);
 
-        // Запуск клиента с правильными аргументами
-        std::wstring cmd = L"client.exe " + client->pipeName;
+        std::wstring cmd = L"client.exe " + pipeName;
         std::vector<wchar_t> cmdLine(cmd.begin(), cmd.end());
-        cmdLine.push_back(L'\0'); // Обязательный нулевой терминатор
+        cmdLine.push_back(L'\0');
 
         STARTUPINFOW si = { sizeof(si) };
         PROCESS_INFORMATION pi;
         if (!CreateProcessW(
-            L"client.exe",
-             cmdLine.data(),
+            NULL,
+            cmdLine.data(),
             NULL,
             NULL,
             FALSE,
@@ -120,6 +113,7 @@ int wmain() {
             CloseHandle(pi.hThread);
             CloseHandle(pi.hProcess);
         }
+        CloseHandle(hThread);
     }
 
     WaitForMultipleObjects(events.size(), events.data(), TRUE, INFINITE);
