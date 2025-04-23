@@ -9,6 +9,8 @@
 #include <csignal>
 
 #pragma comment(lib, "ws2_32.lib")
+// g++ server_m.cpp -o server.exe -lws2_32
+
 
 const int MAX_CLIENTS = 3;
 const int BUFFER_SIZE = 1024;
@@ -27,14 +29,14 @@ std::vector<std::string> chatHistory;
 int clientCounter = 0;
 
 void ShutdownServer() {
-    serverRunning = false;
-    WaitForSingleObject(hMutex, INFINITE);
-    for (const auto& client : clients) {
+    serverRunning = false;// Остановка основного цикла сервера
+    WaitForSingleObject(hMutex, INFINITE); // Блокировка мьютекса для безопасной работы с клиентами
+    for (const auto& client : clients) { // Закрытие всех клиентских сокетов
         shutdown(client.socket, SD_BOTH);
         closesocket(client.socket);
     }
     clients.clear();
-    ReleaseMutex(hMutex);
+    ReleaseMutex(hMutex);// Разблокировка мьютекса
     closesocket(serverSocket);
     WSACleanup();
     CloseHandle(hSemaphore);
@@ -44,7 +46,7 @@ void ShutdownServer() {
 
 BOOL WINAPI ConsoleHandler(DWORD signal) {
     if (signal == CTRL_C_EVENT) {
-        ShutdownServer();
+        ShutdownServer(); // Корректное завершение при нажатии Ctrl+C
         return TRUE;
     }
     return FALSE;
