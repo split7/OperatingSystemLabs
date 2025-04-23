@@ -7,17 +7,17 @@
 #include <atomic>
 #include <thread>
 
-#pragma comment(lib, "ws2_32.lib")
-#pragma comment(lib, "user32.lib")
-#pragma comment(lib, "gdi32.lib")
+#pragma comment(lib, "ws2_32.lib")// Сетевая библиотека
+#pragma comment(lib, "user32.lib")// GUI элементы
+#pragma comment(lib, "gdi32.lib") // Графика
 //g++ server_m.cpp -o server.exe -lws2_32 -lgdi32 -luser32 -mwindows
 
 const int MAX_CLIENTS = 3;
 const int BUFFER_SIZE = 1024;
-const COLORREF BG_COLOR = RGB(40, 40, 60);
-const COLORREF TEXT_COLOR = RGB(200, 200, 220);
+const COLORREF BG_COLOR = RGB(40, 40, 60); // Цвет фона
+const COLORREF TEXT_COLOR = RGB(200, 200, 220);// Цвет текста
 
-HWND hStartBtn, hExitBtn, hLogList, hStatusLabel;
+HWND hStartBtn, hExitBtn, hLogList, hStatusLabel;// Элементы GUI
 std::atomic_bool serverRunning(false);
 SOCKET serverSocket = INVALID_SOCKET;
 HANDLE hSemaphore, hMutex;
@@ -39,23 +39,25 @@ void InitControls(HWND hWnd);
 void UpdateStatus();
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev, LPSTR lpCmd, int nShow) {
+    // Регистрация класса окна
     WNDCLASSW wc = { 0 };
     wc.lpfnWndProc = WndProc;
     wc.hInstance = hInstance;
     wc.lpszClassName = L"ServerClass";
     wc.hbrBackground = CreateSolidBrush(BG_COLOR);
-    RegisterClassW(&wc);
+    RegisterClassW(&wc); //Регистрирует класс окна для последующего использования в вызовах функции CreateWindow
 
     HWND hWnd = CreateWindowW(L"ServerClass", L"Chat Server", WS_OVERLAPPEDWINDOW,
         100, 100, 800, 600, NULL, NULL, hInstance, NULL);
 
-    InitControls(hWnd);
+    InitControls(hWnd); // Инициализация элементов управления
     hBackgroundBrush = CreateSolidBrush(BG_COLOR);
 
     ShowWindow(hWnd, nShow);
     UpdateWindow(hWnd);
 
     MSG msg;
+    // Цикл обработки сообщений
     while (GetMessageW(&msg, NULL, 0, 0)) {
         TranslateMessage(&msg);
         DispatchMessage(&msg);
@@ -68,14 +70,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrev, LPSTR lpCmd, int nShow)
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         case WM_CTLCOLORSTATIC:
-        case WM_CTLCOLORLISTBOX: {
+        case WM_CTLCOLORLISTBOX: { // Обработка цветов элементов
             HDC hdc = (HDC)wParam;
             SetTextColor(hdc, TEXT_COLOR);
             SetBkColor(hdc, BG_COLOR);
             return (LRESULT)hBackgroundBrush;
         }
 
-        case WM_COMMAND: {
+        case WM_COMMAND: {// Обработка кнопок Start/Exit
             switch (LOWORD(wParam)) {
                 case 1:
                     if (!serverRunning) {
@@ -100,7 +102,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             PostQuitMessage(0);
             break;
 
-        case WM_USER:
+        case WM_USER:// Добавление сообщений в ListBox
             SendMessageW(hLogList, LB_ADDSTRING, 0, lParam);
             delete[] (wchar_t*)lParam;
             break;
@@ -136,6 +138,7 @@ void UpdateStatus() {
 }
 
 void ServerThread() {
+    // Инициализация Winsock
     WSADATA wsaData;
     if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
         AddLogMessage("WSAStartup failed!");
@@ -154,6 +157,7 @@ void ServerThread() {
     serverAddr.sin_addr.s_addr = INADDR_ANY;
     serverAddr.sin_port = htons(12345);
 
+    // Привязка и прослушивание
     if (bind(serverSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == SOCKET_ERROR) {
         AddLogMessage("Bind failed!");
         closesocket(serverSocket);
@@ -174,6 +178,7 @@ void ServerThread() {
     AddLogMessage("Server started on port 12345");
     UpdateStatus();
 
+    //цикл принятия подключений
     while (serverRunning) {
         SOCKET clientSocket = accept(serverSocket, NULL, NULL);
         if (clientSocket == INVALID_SOCKET) continue;
@@ -194,9 +199,9 @@ DWORD WINAPI ClientHandler(LPVOID lpParam) {
     char buffer[BUFFER_SIZE];
     int currentId = 0;
 
-    WaitForSingleObject(hSemaphore, INFINITE);
+    WaitForSingleObject(hSemaphore, INFINITE);// Ожидание свободного слота
 
-    WaitForSingleObject(hMutex, INFINITE);
+    WaitForSingleObject(hMutex, INFINITE); // Регистрация клиента
     currentId = ++clientCounter;
     clients.push_back({clientSocket, currentId});
     ReleaseMutex(hMutex);
@@ -225,6 +230,7 @@ DWORD WINAPI ClientHandler(LPVOID lpParam) {
     }
     ReleaseMutex(hMutex);
 
+    // Цикл приема сообщений
     while (true) {
         int bytesReceived = recv(clientSocket, buffer, BUFFER_SIZE, 0);
         if (bytesReceived <= 0 || !serverRunning) break;

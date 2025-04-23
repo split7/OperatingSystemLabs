@@ -35,15 +35,19 @@ void SafeDisconnect();
 void InitControls(HWND hWnd);
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
-    WNDCLASSW wc = { 0 };
-    wc.lpfnWndProc = WndProc;
+    WNDCLASSW wc = { 0 };// Регистрация класса окна
+    wc.lpfnWndProc = WndProc;  // Обработчик сообщений
     wc.hInstance = hInstance;
     wc.lpszClassName = L"ChatClient";
     wc.hbrBackground = CreateSolidBrush(BG_COLOR);
     RegisterClassW(&wc);
 
     hWndMain = CreateWindowW(L"ChatClient", L"Chat Client", WS_OVERLAPPEDWINDOW,
-        100, 100, 800, 600, NULL, NULL, hInstance, NULL);
+        100, 100, 800, 600,
+        NULL, //Дескриптор окна родительского или владельца создаваемого окна.
+        NULL, //если будет использоваться меню класса
+        hInstance, //Дескриптор экземпляра модуля, связанного с окном.
+        NULL); //никаких дополнительных данных не требуется.
 
     InitControls(hWndMain);
     hBackgroundBrush = CreateSolidBrush(BG_COLOR);
@@ -83,26 +87,29 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     UpdateWindow(hWndMain);
 
     MSG msg;
-    while (GetMessageW(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+    while (GetMessageW(&msg, //Извлекает сообщение из очереди сообщений вызывающего потока.
+        NULL, //обрабатываются сообщения окна и потоковые сообщения.
+        0, //Целочисленное значение наименьшего значения сообщения, которое необходимо извлечь.
+        0)) {
+        TranslateMessage(&msg); //Преобразует сообщения с виртуальным ключом в символьные сообщения.
+        DispatchMessage(&msg); //Отправляет сообщение в процедуру окна
     }
 
-    DeleteObject(hFont);
+    DeleteObject(hFont); //После удаления объекта указанный дескриптор становится недействительным.
     DeleteObject(hBackgroundBrush);
-    return (int)msg.wParam;
+    return (int)msg.wParam; //Дополнительные сведения о сообщении.
 }
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
-        case WM_CTLCOLOREDIT: {
+        case WM_CTLCOLOREDIT: { //элемент управления должен быть отрисован
             HDC hdc = (HDC)wParam;
             SetTextColor(hdc, TEXT_COLOR);
             SetBkColor(hdc, INPUT_BG_COLOR);
             return (LRESULT)CreateSolidBrush(INPUT_BG_COLOR);
         }
 
-        case WM_CTLCOLORLISTBOX: {
+        case WM_CTLCOLORLISTBOX: {//Отправляется в родительское окно списка перед тем, как система нарисует его.
             HDC hdc = (HDC)wParam;
             SetTextColor(hdc, TEXT_COLOR);
             SetBkColor(hdc, BG_COLOR);
@@ -119,7 +126,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     }
 
                     wchar_t buffer[BUFFER_SIZE];
-                    GetWindowTextW(hInputEdit, buffer, BUFFER_SIZE);
+                    GetWindowTextW(hInputEdit, buffer, BUFFER_SIZE);//Копирует текст строки заголовка указанного окна (если он имеется) в буфер.
                     if (wcslen(buffer) > 0) {
                         char narrowBuffer[BUFFER_SIZE];
                         WideCharToMultiByte(CP_UTF8, 0, buffer, -1, narrowBuffer, BUFFER_SIZE, NULL, NULL);
@@ -137,7 +144,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     break;
 
                 case 4: // Exit
-                    PostMessageW(hWnd, WM_CLOSE, 0, 0);
+                    PostMessageW(hWnd, WM_CLOSE, 0, 0); //Помещает (публикует) сообщение в очереди сообщений
                     break;
             }
             break;
@@ -149,7 +156,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             break;
 
         case WM_DESTROY:
-            PostQuitMessage(0);
+            PostQuitMessage(0); //Указывает системе, что поток сделал запрос на завершение (завершение работы)
             break;
 
         case WM_USER: {
@@ -163,7 +170,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             break;
         }
 
-        case WM_DRAWITEM: {
+        case WM_DRAWITEM: { //Отправляется в родительское окно нарисованной владельцем кнопки, поля со списком, списка или меню при изменении визуального аспекта кнопки, поля со списком или меню.
             DRAWITEMSTRUCT* dis = (DRAWITEMSTRUCT*)lParam;
             if (dis->CtlType != ODT_BUTTON) return FALSE;
 
@@ -185,7 +192,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
 
         default:
-            return DefWindowProcW(hWnd, msg, wParam, lParam);
+            return DefWindowProcW(hWnd, msg, wParam, lParam); //Вызывает процедуру окна по умолчанию, чтобы обеспечить обработку по умолчанию для любых сообщений окна, которые приложение не обрабатывает.
     }
     return 0;
 }
