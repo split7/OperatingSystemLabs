@@ -8,7 +8,7 @@
 
 // g++ client_m.cpp -o client.exe -lws2_32
 
-#pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "ws2_32.lib") //Сетевая библиотека
 
 const int BUFFER_SIZE = 1024;
 std::atomic_bool clientRunning(true);
@@ -17,7 +17,10 @@ int clientId = -1;
 void ReceiveMessages(SOCKET sock) {
     char buffer[BUFFER_SIZE]; // Буфер для приема данных
     while (clientRunning) {  // Бесконечный цикл пока работает клиент
-        int bytesReceived = recv(sock, buffer, BUFFER_SIZE, 0);  // Прием данных от сервера
+        int bytesReceived = recv(sock, //Дескриптор, идентифицирующий подключенный сокет.
+            buffer,//Указатель на буфер для получения входящих данных.
+            BUFFER_SIZE,//Длина (в байтах) буфера, на который указывает параметр buf .
+            0);  // Прием данных от сервера
         if (bytesReceived <= 0) {
             std::cout << "Connection closed by server." << std::endl;
             clientRunning = false;
@@ -40,7 +43,9 @@ int main() {
     WSAStartup(MAKEWORD(2, 2), &wsaData);
 
     // Создание сокета
-    SOCKET sock = socket(AF_INET, SOCK_STREAM, 0);// TCP-сокет
+    SOCKET sock = socket(AF_INET, //Семейство адресов IPv4.
+        SOCK_STREAM, 0);// TCP-сокет
+
     // Настройка адреса сервера
     sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
@@ -69,7 +74,8 @@ int main() {
         send(sock, message.c_str(), message.size() + 1, 0);
     }
 
-    shutdown(sock, SD_BOTH);
+    shutdown(sock,
+        SD_BOTH);//Завершите операции отправки и получения.
     closesocket(sock);
     WSACleanup();
     return 0;

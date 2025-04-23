@@ -131,11 +131,11 @@ int main() {
     serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = INADDR_ANY;
+    serverAddr.sin_addr.s_addr = INADDR_ANY; //IP-адрес заранее не определён
     serverAddr.sin_port = htons(12345);
 
-    bind(serverSocket, (sockaddr*)&serverAddr, sizeof(serverAddr));
-    listen(serverSocket, SOMAXCONN);
+    bind(serverSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)); //Функция привязки связывает локальный адрес со сокетом.
+    listen(serverSocket, SOMAXCONN); //Помещает сокет в состояние, в котором он прослушивает входящее соединение.
 
     hSemaphore = CreateSemaphore(NULL, MAX_CLIENTS, MAX_CLIENTS, NULL);
     hMutex = CreateMutex(NULL, FALSE, NULL);
@@ -143,7 +143,7 @@ int main() {
     std::cout << "[SERVER] Server started on port 12345" << std::endl;
 
     while (serverRunning) {
-        SOCKET clientSocket = accept(serverSocket, NULL, NULL);
+        SOCKET clientSocket = accept(serverSocket, NULL, NULL); //разрешает входящую попытку подключения к сокету
         if (clientSocket == INVALID_SOCKET) continue;
 
         CreateThread(NULL, 0, ClientHandler, (LPVOID)clientSocket, 0, NULL);
